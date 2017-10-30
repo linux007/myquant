@@ -35,15 +35,15 @@ function main() {
         //计算BIAS （N期BIAS=(当日收盘价-N期平均收盘价)/N期平均收盘价*100%）
         var barClosePrice = []
         var biasArr = []
-        var biasSum = 0
+       // var biasSum = 0
         var avgClose = 0
         var biasPeriodSum = 0
         
         _.each(r, function(item) {
             barClosePrice.push(item.Close)
         })
-        /*
-        for (var i=0; i<=nPeriod; i++) {
+        
+        for (var i=0; i<nPeriod; i++) {
             var SliceBar = barClosePrice.slice(-(BiasPeriod + i), barClosePrice.length-i)
             //Log('SliceBar', SliceBar)
             var biasSum = 0
@@ -51,15 +51,11 @@ function main() {
                 biasSum += num
             })
             avgClose = _N(biasSum/SliceBar.length, 0)
-            var current_bar_close = SliceBar[SliceBar.length - (i+1)]
+            var current_bar_close = SliceBar[SliceBar.length - 1]
             var bias_item = _N((current_bar_close - avgClose)/avgClose * 100, 2)
-            // 求前nPeriod的bias和
-            if (i > 0) {
-                biasPeriodSum += bias_item
-            }
             biasArr.push(bias_item)
-        }*/
-        
+        }
+        /*
         var SliceBar = barClosePrice.slice(-BiasPeriod)
         //Log('allClose:', barClosePrice)
         //Log('barClosePrice:', AvgBias)
@@ -70,9 +66,20 @@ function main() {
         })
         avgClose = _N(biasSum/SliceBar.length, 0)
         var bias = _N((current_bar.Close - avgClose)/avgClose * 100, 2)
-        
-        //var avgBias = _N(biasPeriodSum/nPeriod, 2)
-        //var bias = biasArr[0]
+        */
+        var previous_nPeriod_bias = biasArr.slice(1)
+        var bias_highest = Math.max.apply(null, previous_nPeriod_bias)
+        var bias_lowest = Math.min.apply(null, previous_nPeriod_bias)
+        // Log('bias_nPeriod', previous_nPeriod_bias)
+        // Log('biasArr:', biasArr, 'bias_highest:', bias_highest, 'bias_lowest:', bias_lowest)
+        var previous_nPeriod_bias_sum = 0
+        _.each(previous_nPeriod_bias, function(num) {
+            previous_nPeriod_bias_sum += num
+        })
+        var middle_bias = _N((bias_lowest + bias_highest)/2, 2)
+        //var middle_bias = _N(previous_nPeriod_bias_sum/previous_nPeriod_bias.length, 2)
+        var bias = biasArr[0]
+
         //Log('当前bias:', bias, '平均bias:', avgBias * avgBiasRatio)
         //Log('Bias:', biasArr, '当前价格', ticker.Last)
     
@@ -85,16 +92,6 @@ function main() {
         var J = J_List[J_List.length - 1]
         var previous_k_value = K_List[K_List.length - 2]
         var previous_d_value = D_List[D_List.length - 2]
-        
-        // 量能潮
-        var close = []
-        _.each(r, function(item) {
-            close.push(item.Close)
-        })
-        var roc = talib.ROC(close, RocPeriod)
-        //Log('roc:', roc)
-        var previous_maroc = roc[roc.length-2]
-        var current_maroc = roc[roc.length-1]
         
         //macd
         var macd = TA.MACD(r, 12, 26, 9)
@@ -125,14 +122,6 @@ function main() {
         // 持多单
         if(mp > 0) {
            var highest = TA.Highest(r, AtrPeriod, 'High')
-           // 做多止损  (吊灯止损)
-           /*
-           var LongLoss = _N(highest - atr[atr.length - 1] * AtrConstant, 0)
-           if (ticker.Last <= LongLoss) {
-               Log('做多止损:', LongLoss, '当前价格:', ticker.Last)
-               return 0
-           }
-           */
            //止盈平仓
            var LongWinKey = symbol + '_longWin'
            if ( !_G(LongWinKey) ) {
@@ -145,18 +134,17 @@ function main() {
            // 2. kd 死叉
            // 3. bias 乖离值转折
            var CloseBuySignal = false
+           /*
+           if (bias <= middle_bias) {
+                Log('bias下探中轨，止盈', 'bias:middle_bias=', bias,':', middle_bias, 'biasArr:', previous_nPeriod_bias)
+                CloseBuySignal = true
+           }*/
            
            if ((D >= 80)) {
                Log('D:', D, 'J:', J, 'bias:', bias, '当前价格:', ticker.Last)
                CloseBuySignal = true
            }
            
-           // macd 趋势止盈 macd 转头向下
-           /*
-           if (previous_macd > current_macd) {
-               Log('macd止盈:', '上一个macd:', previous_macd, '当前macd:', current_macd)
-               CloseBuySignal = true
-           }*/
            // K线从上向下穿过D线
            var kdj_closebuy_signal = false
            if ( previous_k_value > previous_d_value && K < D ) {
@@ -209,22 +197,17 @@ function main() {
            // 2. kd 金叉
            // 3. bias <= BiasShortThreshold
            var CloseSellSignal = false
+           /*
+           if (bias >= middle_bias) {
+              Log('bias上探中轨，止盈', 'bias:middle_bias=', bias,':', middle_bias, 'biasArr:',previous_nPeriod_bias)
+              CloseSellSignal = true
+           }*/
+           
            if (D < 20) {
                Log('KDJ止盈：', 'D:', D, 'J:', J)
                CloseSellSignal = true
            }
-           // K线从下向上穿过D线
-           /*
-           if ( previous_k_value < previous_d_value && K > D ) {
-               Log('kdj 金叉')
-               CloseSellSignal = true
-           }
-           */
-           /*
-           if (bias <= BiasShortThreshold) {
-               Log('bias 平仓信号')
-               CloseSellSignal = true
-           }*/
+
            if (CloseSellSignal) {
                Log('空单止盈:', '开仓价=', holdPrice)
                return 0
@@ -254,8 +237,6 @@ function main() {
             if (D > 80) {
                 return
             }
-            // 判断量能是否背离
-            //if (previous_maroc > current_maroc) return
             
             // 1. sar 趋势对不对 2. kdj 有一个不符合就过滤 (d,j)
             //Log('previous_roc:', previous_maroc, 'current_maroc:', current_maroc)
