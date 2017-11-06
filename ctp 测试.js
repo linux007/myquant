@@ -1,7 +1,7 @@
-// botvs@d5e00dd2f1a73db8011afc3f8e584de3
+// botvs@6f9c5dcb92458db753c7b89f53adbc9e
 /*backtest
 start: 2017-09-27 00:00:00
-end: 2017-10-24 00:00:00
+end: 2017-10-28 00:00:00
 period: 15m
 */
 function main() {
@@ -38,6 +38,7 @@ function main() {
         var biasSum = 0
         var avgClose = 0
         var biasPeriodSum = 0
+        var amount = Lots
         
         _.each(r, function(item) {
             barClosePrice.push(item.Close)
@@ -86,15 +87,25 @@ function main() {
         var previous_k_value = K_List[K_List.length - 2]
         var previous_d_value = D_List[D_List.length - 2]
         
+        //MA
+        var kama = talib.KAMA(barClosePrice, 30)
+        var current_kama = kama[kama.length-1]
         // 量能潮
-        var close = []
-        _.each(r, function(item) {
-            close.push(item.Close)
-        })
-        var roc = talib.ROC(close, RocPeriod)
-        //Log('roc:', roc)
-        var previous_maroc = roc[roc.length-2]
-        var current_maroc = roc[roc.length-1]
+        var obv = TA.OBV(r)
+        //var current_obv = 
+        
+        //sar
+        var sar_trend = 0
+        var sar = talib.SAR(r, SAR_AF)
+        var current_sar = sar[sar.length-1]
+        // sar 空头
+        if (ticker.Last < current_sar) {
+            sar_trend = 1
+        }
+        // sar 多头
+        if (ticker.Last > current_sar) {
+            sar_trend = 2 
+        }
         
         //macd
         var macd = TA.MACD(r, 8, 13, 9)
@@ -109,30 +120,23 @@ function main() {
         var current_macd = his[his.length-1]
         
         //macd 空头趋势
-        var macd_trend = 0
+        if ((current_macd < 0) && (current_dif < 0) && (current_dea < 0) && ((previous_dif > current_dif) || (previous_dea > current_dea))) {
+            macd_trend = 1
+        }
 
-        //macd 多头趋势
-        if ((current_macd > 0) && ((previous_dif < current_dif) || (previous_dea < current_dea))) {
+        //macd 强势多头
+        if ((current_macd > 0) && (current_dif > 0) && (current_dea > 0) && ((previous_dif < current_dif) || (previous_dea < current_dea))) {
             macd_trend = 2
         }
-        
-        //macd 由弱转强  (止盈止损)
-        if (previous_macd < current_macd) {
+
+        // macd 弱势  多单适当减仓
+        if ((current_macd > 0) && ((previous_dif > current_dif) && (previous_dea > current_dea))) {
             macd_trend = 3
         }
-         
+
         // 判断当前有没有持仓, 判断止盈止损
         // 持多单
         if(mp > 0) {
-           var highest = TA.Highest(r, AtrPeriod, 'High')
-           // 做多止损  (吊灯止损)
-           /*
-           var LongLoss = _N(highest - atr[atr.length - 1] * AtrConstant, 0)
-           if (ticker.Last <= LongLoss) {
-               Log('做多止损:', LongLoss, '当前价格:', ticker.Last)
-               return 0
-           }
-           */
            //止盈平仓
            var LongWinKey = symbol + '_longWin'
            if ( !_G(LongWinKey) ) {
@@ -162,8 +166,8 @@ function main() {
            if ( previous_k_value > previous_d_value && K < D ) {
                kdj_closebuy_signal = true
            }
-            
-           if (D >= 70 && kdj_closebuy_signal) {
+           
+           if (kdj_closebuy_signal && macd_trend == 3) {
                Log('多单止盈，kdj 死叉')
                CloseBuySignal = true
            }
@@ -196,6 +200,8 @@ function main() {
                Log('做空止损:', shortLosss, '当前价格:', ticker.Last)
                return 0
            }
+
+           Log('kama:price', current_kama, ':', ticker.Last)
            
            //平仓止盈
            var ShortWinKey = symbol + '_shortWin'
@@ -213,18 +219,7 @@ function main() {
                Log('KDJ止盈：', 'D:', D, 'J:', J)
                CloseSellSignal = true
            }
-           // K线从下向上穿过D线
-           /*
-           if ( previous_k_value < previous_d_value && K > D ) {
-               Log('kdj 金叉')
-               CloseSellSignal = true
-           }
-           */
-           /*
-           if (bias <= BiasShortThreshold) {
-               Log('bias 平仓信号')
-               CloseSellSignal = true
-           }*/
+
            if (CloseSellSignal) {
                Log('空单止盈:', '开仓价=', holdPrice)
                return 0
@@ -232,62 +227,64 @@ function main() {
         }
      
         // 沽多
-        if ((cci[cci.length-2] <= -100 && cci[cci.length-1] > -100) || (cci[cci.length-2] <= 100 && cci[cci.length-1] > 100)) {
+        if ((cci[cci.length-2] <= -126 && cci[cci.length-1] > -126) || (cci[cci.length-2] <= 100 && cci[cci.length-1] > 100)) {
             if (Math.abs(mp) > 0) return
-            Log('开多仓条件:', cci[cci.length-2], '==>', cci[cci.length-1], '当前价格:', ticker.Sell, ticker.Buy, ticker.Last, 'KDJ', K,':',D,':',J)
-            
-            Log('p_dif:c_dif', previous_dif, ':', current_dif, 'p_dea:c_dea', previous_dea, ':', current_dea, 'macd:', current_macd)
-            if ((current_macd < 0) && (previous_dif>current_dif) || (previous_dea>current_dea)) {
-                macd_trend = 1
-            }
-            //判断macd 趋势
-            if (macd_trend == 1) {
-                Log('macd趋势空头，谨慎做多')
+
+            if (J > 90) {
+                Log('KDJ钝化:',K,D,J)
                 return
             }
-            // 同一个bar周期只开一单
-            /*
-            if ( _G('startLongTime') && _G('startLongTime') + global_period >= new Date().getTime() ) {
-                return 
-            }*/
+            if (sar_trend == 1) {
+                Log('sar 空头，谨慎做多')
+                return   
+            }
+            Log('开多仓条件:', cci[cci.length-2], '==>', cci[cci.length-1], '当前价格:', ticker.Sell, ticker.Buy, ticker.Last, 'KDJ', K,':',D,':',J)
+            
+           // Log('p_dif:c_dif', previous_dif, ':', current_dif, 'p_dea:c_dea', previous_dea, ':', current_dea, 'macd:', current_macd)
+            // Log('sar:', current_sar, ticker.Last)
+            if (sar_trend == 2) {
+                Log('sar 多头')
+                amount = _N(Lots * 2.5, 0)
+            }
+
             // kdj钝化
             if (D > 80) {
                 return
             }
-            // 判断量能是否背离
-            //if (previous_maroc > current_maroc) return
-            
-            // 1. sar 趋势对不对 2. kdj 有一个不符合就过滤 (d,j)
-            //Log('previous_roc:', previous_maroc, 'current_maroc:', current_maroc)
+
             _G('startLongTime', current_bar.Time)
             // 逆势开多单，枪反弹
             if (bias < 0) {
                 _G('biasLong', true)
             }
-            return Lots 
+            return amount 
         }
         // 沽空
-        if ((cci[cci.length-1] < 100 && cci[cci.length-2] >= 100) || (cci[cci.length-1] < -100 && cci[cci.length-2] > -100)) {
+        if ((cci[cci.length-1] < 126 && cci[cci.length-2] >= 126) || (cci[cci.length-1] < -100 && cci[cci.length-2] > -100)) {
             if (Math.abs(mp) > 0) return
+
+            if (J < 10) {
+              Log('KDJ钝化:',K,D,J)
+              return
+            }
+
+            if (sar_trend == 2) {
+                Log('sar 多头，谨慎做空')
+                return   
+            }
             Log('开空仓条件:', cci[cci.length-2], '==>', cci[cci.length-1], '当前价格:', ticker.Sell, ticker.Buy, ticker.Last, 'KDJ:', K,':',D,':',J)
-            // 同一个bar周期只开一单
-            /*
-            if ( _G('startLongTime') && _G('startLongTime') + global_period >= new Date().getTime() ) {
-                return 
-            }*/
-            
-             //判断macd 趋势
-            if (macd_trend == 2) {
-                Log('macd趋势多头，谨慎做空')
-                return
+
+            // 判断sar 空头
+            if (sar_trend == 1) {
+                Log('sar 空头:', ticker.Last, current_sar)
+                amount = _N(Lots * 2.5, 0)
             }
             
             // kdj钝化
-            if (D < 30) {
-                return
-            }
+            /*
+*/
             _G('startLongTime', current_bar.Time)
-            return -Lots
+            return -amount
         }
 
     });
