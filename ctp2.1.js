@@ -1,4 +1,4 @@
-// botvs@f6d22183d0a63afec76f15f9789dbcd7
+// botvs@8c28d00fbca70567e16fd3836d3e7e97
 /*backtest
 start: 2017-09-10 00:00:00
 end: 2017-11-15 00:00:00
@@ -84,7 +84,7 @@ function main() {
         // Log(ma_cross, '|ticker=', ticker.Last, 'pre_cci:cur_cci=', previous_cci, ':', current_cci)
         // Log('macd:: cross=', macd_cross, 'dif=', current_dif, 'dea=', current_dea)
 
-        /*
+        
         // 开空
         if (mp === 0 && macd_cross >= -3  && ma_cross >= -3 && ma_cross < 0 && current_macd < 0 && (previous_bar.Close < previous_ma5)) {
 
@@ -113,9 +113,8 @@ function main() {
                 return 0
             }
         }
-        */
         
-        
+      	/*
         // 开多
         if (mp === 0) {
             // previous_ma5 < current_ma5 && previous_ma10 < current_ma10 && 
@@ -132,8 +131,8 @@ function main() {
                         var ticker_temp = _C(exchange.GetTicker)
                         // Log('当前价格=', ticker_temp.Last)
                         if (ticker_temp.Last <= open_price) {
-                        	var cci_ma = TA.MA(cci, 28)
-                        	var current_cci_ma = cci_ma[cci_ma.length-1]
+                            var cci_ma = TA.MA(cci, 28)
+                            var current_cci_ma = cci_ma[cci_ma.length-1]
                             Log('macd_cross=', macd_cross, ' premacd:curmacd=', previous_macd, ':', current_macd, ' predif:curdif=', previous_dif, ':', current_dif, ' dea=', previous_dea, ':',current_dea)
                             // Log('ma_cross=', ma_cross, ' close:ma20=', previous_bar.Close, ':', previous_ma5)
                             Log('rsi_cross=', rsi_cross, '开仓价格=', ticker.Last)
@@ -151,30 +150,11 @@ function main() {
                     
                 }
             }
-            /*
-            if (macd_cross > 0) {
-                if (previous_bar.Close > previous_ma5 && previous_ma20 < current_ma20) {
-                    if (previous_ma5 < current_ma5 && previous_ma10 < current_ma10 && previous_ma10 > previous_ma5 && current_ma5 > current_ma10) {
-                        if (previous_cci < current_cci) {
-                            Log('macd_cross=', macd_cross, ' premacd:curmacd=', previous_macd, ':', current_macd, ' predif:curdif=', previous_dif, ':', current_dif, ' dea=', previous_dea, ':',current_dea)
-                            // Log('ma_cross=', ma_cross, ' close:ma20=', previous_bar.Close, ':', previous_ma5)
-                            Log('prersi:currsi=', previous_rsi, ':', current_rsi)
-                            Log('prema20:curma20=', previous_ma20, ':', current_ma20)
-                            Log('prema10:curma10=', previous_ma10, ':', current_ma10)
-                            Log('prema5:curma5=', previous_ma5, ':', current_ma5)
-                            Log('ma5:ma10:ma20=', current_ma5, ':', current_ma10, ':', current_ma20)
-                            Log('precci:curcci=', previous_cci, ':', current_cci, 'rsi=', current_rsi, 'kdj=', current_K, ':', current_D, ':', current_J, ' kdj_cross=', kdj_cross)
-                            return Lots
-                        }
-                    }
-                }
-            }*/
-            
-            
         }
 
         //持多
         if (mp > 0) {
+            
             //////////////////////////////////////////////////////////////////////////////
             //特殊转向也分向上转向和向下转向两种。若当日最高价高于前一日的最高价，且最低价低于前一日的最低价，而收盘价高于上一日收盘价，便构成特殊向上转向信号。 //
             //反之，若当日最高价低于上日最高价，且最低价高于上一日的最低价，而收盘价低于上一日收盘价，便构成特殊向下转向信号。
@@ -187,15 +167,23 @@ function main() {
             var previous_ma5_cci = ma5_cci[ma5_cci.length-2]
             var current_ma5_cci = ma5_cci[ma5_cci.length-1]
 
+            var ma5_records = exchange.GetRecords(PERIOD_M30)
+            var KDJ = TA.KDJ(ma5_records, 9, 3, 3)
+            var K = KDJ[0]
+            var D = KDJ[1]
+            var J = KDJ[2]
+            var current_K = K[K.length-1]
+            var current_D = D[D.length-1]
+            var current_J = J[J.length-1]
+
             if (ticker.Last > hold && current_ma5_bar.High < previous_ma5_bar.High && current_ma5_bar.Low > previous_ma5_bar.Low && current_ma5_bar.Close <= previous_ma5_bar.Close) {
-                Log('previous_ma5_cci=', previous_ma5_cci, 'current_ma5_cci=', current_ma5_cci)
-                if (previous_ma5_cci > 180 && previous_ma5_cci > current_ma5_cci) {
-                	Log('kdj=', current_K, ':', current_D, ':', current_J)
+                // Log('previous_ma5_cci=', previous_ma5_cci, 'current_ma5_cci=', current_ma5_cci)
+                if (previous_ma5_cci > 180 && previous_ma5_cci > current_ma5_cci && current_D > 70) {
+                    Log('kdj=', current_K, ':', current_D, ':', current_J)
                     // Log('ma5 bar=', current_ma5_bar)
                     return 0
                 }
             }
-
 
             // Log('KDJ=', current_D, ':', current_J, 'price=', ticker.Last, 'low=', current_bar.Low, 'close=', current_bar.Close)
             // 止损
@@ -204,9 +192,7 @@ function main() {
                 return 0
             }
         }
-        
-        
-
+        */
 
     })
 }
